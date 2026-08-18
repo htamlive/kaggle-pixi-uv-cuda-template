@@ -1,24 +1,25 @@
-# Kaggle Pixi + uv CUDA template
+# Kaggle Pixi CUDA template
 
-This repository packages a locked PyTorch/CUDA project as a small, reviewable
-Kaggle Dataset, then stages and runs it from a GPU-enabled Kaggle script. The
-default is Python 3.12, CUDA Toolkit/NVCC 12.4, and PyTorch 2.4.1 from the
-explicit CUDA 12.4 wheel index.
+This repository stages and runs a manually created PyTorch/CUDA project archive
+from a GPU-enabled Kaggle script. No lockfiles are committed.
 
-## Choose and build a profile
+## Choose and ZIP a profile
 
-The independently locked projects live in `projects/base/` and
-`projects/research-stack/`. Review one, then generate the deterministic dataset
-archive:
+The independent projects live in `projects/base/` and `projects/research-stack/`.
+Choose what your Dataset should contain and create `upload_payload/repo.zip`
+yourself. Either a flat archive or one top-level project directory is accepted:
 
 ```bash
-python scripts/build_payload.py --profile base
-# or: python scripts/build_payload.py --profile research
+cd projects/base
+zip -r ../../upload_payload/repo.zip pixi.toml README.md scripts
+
+# Or preserve one wrapper directory for the research profile:
+cd ../..
+zip -r upload_payload/repo.zip projects/research-stack \
+  -x '*/.pixi/*' '*/.venv/*' '*/pixi.lock' '*/uv.lock'
 ```
 
-Only `.python-version`, manifests, locks, the profile README, and CUDA check
-script are allowed into `upload_payload/repo.zip`. The generated ZIP is ignored
-by Git.
+The ZIP is ignored by Git. The entrypoint also accepts an unpacked project.
 
 ## Publish to Kaggle
 
@@ -30,27 +31,34 @@ API credentials configured:
 cd upload_payload
 kaggle datasets create -p .
 # For later revisions:
-kaggle datasets version -p . -m "Update locked CUDA project"
+kaggle datasets version -p . -m "Update CUDA project"
 cd ..
 kaggle kernels push -p .
 ```
 
-The kernel needs Internet enabled to install Pixi and download locked packages,
-and GPU enabled for `check-gpu`. The entrypoint discovers exactly one unpacked
-project or `repo.zip`, rejects unsafe ZIP paths, runs `pixi install --locked`,
-syncs uv through the frozen `setup` task, and runs `check-gpu`.
+The kernel needs Internet enabled to install Pixi and packages, and GPU enabled
+for `check-gpu`. The entrypoint requires exactly one discoverable Pixi project
+and rejects absolute paths, traversal, backslashes, symlinks, and malformed
+layouts. It runs `pixi install`, conditionally runs `pixi run uv sync` when a
+`pyproject.toml` exists, then runs the shared `check-gpu` task.
 
-## Local setup and customization
+## Profiles and local use
 
-Inside either project, run `pixi install --locked` and `pixi run setup`; use
-`pixi run check-gpu` on a GPU host. Keep Python, CUDA, PyTorch, and its wheel
-index aligned when changing versions, then regenerate `pixi.lock` with
-`pixi lock` and `uv.lock` with `pixi run uv lock`.
+The base profile is Pixi-only: Pixi installs Python 3.12 and GPU-enabled
+PyTorch, and `check-gpu` runs directly in that environment. Use `pixi install`
+then `pixi run check-gpu`.
+
+The research profile intentionally nests uv inside Pixi because compiled
+extensions need Toolkit/NVCC. Pixi supplies uv and the build toolchain; uv
+reads `.python-version`, downloads managed Python, creates `.venv`, and installs
+the Python packages. Run `pixi install`, `pixi run uv sync`, then
+`pixi run check-gpu`.
+
+> **Important:** the research profile's `CUDA_HOME` points to Pixi's Toolkit.
+> If you remove `cuda-toolkit` or `cuda-nvcc`, also remove `CUDA_HOME`.
 
 If CUDA is unavailable, verify Kaggle's accelerator setting and `nvidia-smi`.
-For driver/runtime errors, use a driver compatible with CUDA 12.4 or select a
-matching CUDA/PyTorch combination. Research-profile extension builds may need
-considerable RAM, disk, and time; inspect compiler output and `CUDA_HOME`.
+Research extension builds can require considerable RAM, disk, and time.
 
 Copy, fork, or use this as a GitHub template. It is CC0: use and adapt it
 freely; no credit is required. This repository does not publish anything to

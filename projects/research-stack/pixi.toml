@@ -5,16 +5,16 @@ channels = ["conda-forge"]
 platforms = [{ platform = "linux-64", cuda = "12.4" }]
 
 [dependencies]
-python = "3.12.*"
 uv = ">=0.12,<0.13"
 cuda-toolkit = "12.4.*"
 cuda-nvcc = "12.4.*"
 ninja = ">=1.12"
 
 [activation.env]
+# IMPORTANT: remove CUDA_HOME if you remove cuda-toolkit/cuda-nvcc above.
 CUDA_HOME = "$CONDA_PREFIX"
+UV_PYTHON_PREFERENCE = "only-managed"
 
 [tasks]
-setup = "uv sync --frozen"
-check-gpu = { cmd = "uv run --frozen python scripts/check_cuda.py", depends-on = ["setup"] }
-lock-check = "uv lock --check"
+setup = "uv sync"
+check-gpu = "uv run python scripts/check_cuda.py"

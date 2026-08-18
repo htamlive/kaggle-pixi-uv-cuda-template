@@ -8,22 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: prefix-dev/setup-pixi@v0.9.3
-        with:
-          pixi-version: v0.75.0
-          run-install: false
-          cache: false
-      - uses: astral-sh/setup-uv@v6
-        with:
-          version: "0.12.1"
       - name: Parse, compile, and test archives
         run: |
           python -c 'import json,pathlib,tomllib; [tomllib.loads(p.read_text()) for p in pathlib.Path(".").rglob("*.toml")]; [json.loads(p.read_text()) for p in pathlib.Path(".").rglob("*.json")]'
-          python -m compileall -q kaggle_entrypoint.py scripts tests projects
+          python -m compileall -q kaggle_entrypoint.py tests projects
           python -m unittest discover -s tests -v
-          python scripts/build_payload.py --profile base
-          python scripts/build_payload.py --profile research
-      - name: Check locks
-        run: |
-          (cd projects/base && pixi lock --check && uv lock --check)
-          (cd projects/research-stack && pixi lock --check && uv lock --check)

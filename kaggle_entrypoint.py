@@ -1,4 +1,4 @@
-"""Safely stage and run a locked Pixi + uv project on Kaggle."""
+"""Safely stage and run a Pixi project on Kaggle."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import tempfile
 import urllib.request
 import zipfile
 
-REQUIRED = {"pixi.toml", "pixi.lock", "pyproject.toml", "uv.lock", "scripts/check_cuda.py"}
+REQUIRED = {"pixi.toml", "scripts/check_cuda.py"}
 
 
 def _safe_members(archive: zipfile.ZipFile) -> list[zipfile.ZipInfo]:
@@ -30,16 +30,22 @@ def _valid_project(path: Path) -> bool:
     return all((path / name).is_file() for name in REQUIRED)
 
 
+def _archive_project_root(members: list[zipfile.ZipInfo]) -> PurePosixPath | None:
+    files = {PurePosixPath(item.filename) for item in members if not item.is_dir()}
+    roots = {path.parent for path in files if path.name == "pixi.toml" and len(path.parent.parts) <= 1}
+    valid = [root for root in roots if all(root / name in files for name in REQUIRED)]
+    return valid[0] if len(valid) == 1 else None
+
+
 def discover(input_root: Path) -> tuple[str, Path]:
     """Return exactly one ('directory'|'zip', path) project candidate."""
     candidates: list[tuple[str, Path]] = []
     for manifest in input_root.rglob("pixi.toml"):
         if _valid_project(manifest.parent):
             candidates.append(("directory", manifest.parent))
-    for archive_path in input_root.rglob("repo.zip"):
+    for archive_path in input_root.rglob("*.zip"):
         with zipfile.ZipFile(archive_path) as archive:
-            names = {i.filename.rstrip("/") for i in _safe_members(archive)}
-            if REQUIRED <= names:
+            if _archive_project_root(_safe_members(archive)) is not None:
                 candidates.append(("zip", archive_path))
     if len(candidates) != 1:
         raise RuntimeError(f"expected exactly one project input, found {len(candidates)}")
@@ -56,7 +62,15 @@ def stage(input_root: Path, working_dir: Path) -> Path:
     else:
         with zipfile.ZipFile(source) as archive:
             members = _safe_members(archive)
+            root = _archive_project_root(members)
+            if root is None:
+                raise RuntimeError("archive must contain exactly one Pixi project")
             archive.extractall(working_dir, members=members)
+        if root.parts:
+            extracted = working_dir / root
+            for item in extracted.iterdir():
+                shutil.move(str(item), working_dir / item.name)
+            extracted.rmdir()
     if not _valid_project(working_dir):
         raise RuntimeError("staged project is incomplete")
     return working_dir
@@ -82,8 +96,9 @@ def run(input_root: Path, working_dir: Path, *, execute: bool = True) -> Path:
     if execute:
         pixi = find_or_install_pixi()
         env = os.environ.copy()
-        subprocess.run([str(pixi), "install", "--locked"], cwd=project, env=env, check=True)
-        subprocess.run([str(pixi), "run", "setup"], cwd=project, env=env, check=True)
+        subprocess.run([str(pixi), "install"], cwd=project, env=env, check=True)
+        if (project / "pyproject.toml").is_file():
+            subprocess.run([str(pixi), "run", "uv", "sync"], cwd=project, env=env, check=True)
         subprocess.run([str(pixi), "run", "check-gpu"], cwd=project, env=env, check=True)
     return project
 

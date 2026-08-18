@@ -7,13 +7,17 @@ does not affect the repository-root environment.
 From this directory:
 
 ```bash
-pixi install --locked
-pixi run setup
+pixi install
+pixi run uv sync
 pixi run check-gpu
 ```
 
 Several dependencies compile CUDA/C++ extensions. Expect a long first build,
 substantial disk use, and failures on low-memory machines. Keep the NVIDIA
-driver new enough for CUDA 12.4. To change Python, CUDA, or PyTorch, update the
-constraints together and regenerate both locks with `pixi lock` and
-`pixi run uv lock`.
+driver new enough for CUDA 12.4. The nested environment is an intentional
+research-only tradeoff: Pixi supplies uv, Toolkit/NVCC, and Ninja, while uv
+manages Python from `.python-version` and installs packages into `.venv`.
+Generated locks are ignored.
+
+> **Important:** if you remove `cuda-toolkit` or `cuda-nvcc`, also remove
+> `CUDA_HOME` from `pixi.toml`.
