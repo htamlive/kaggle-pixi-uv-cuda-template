@@ -1,0 +1,33 @@
+[project]
+name = "pixi-uv-cuda-research-stack"
+version = "0.1.0"
+description = "Standalone CUDA research stack example"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "detectron2 @ git+https://github.com/facebookresearch/detectron2.git",
+  "faiss-gpu-cu12>=1.10",
+  "flash-attn==2.7.4.post1",
+  "pytorch3d @ git+https://github.com/facebookresearch/pytorch3d.git@stable",
+  "torch==2.4.1",
+  "torchaudio==2.4.1",
+  "torchvision==0.19.1",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu124" }
+torchvision = { index = "pytorch-cu124" }
+torchaudio = { index = "pytorch-cu124" }
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[tool.uv.extra-build-dependencies]
+flash-attn = [{ requirement = "torch", match-runtime = true }]
+pytorch3d = ["torch"]
+detectron2 = ["torch"]

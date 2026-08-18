@@ -1,0 +1,20 @@
+[workspace]
+name = "pixi-uv-cuda-research-stack"
+version = "0.1.0"
+channels = ["conda-forge"]
+platforms = [{ platform = "linux-64", cuda = "12.4" }]
+
+[dependencies]
+python = "3.12.*"
+uv = ">=0.12,<0.13"
+cuda-toolkit = "12.4.*"
+cuda-nvcc = "12.4.*"
+ninja = ">=1.12"
+
+[activation.env]
+CUDA_HOME = "$CONDA_PREFIX"
+
+[tasks]
+setup = "uv sync --frozen"
+check-gpu = { cmd = "uv run --frozen python scripts/check_cuda.py", depends-on = ["setup"] }
+lock-check = "uv lock --check"
